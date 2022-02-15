@@ -22,6 +22,8 @@ class _AppState extends State<App> {
   bool isConnecting = true;
   SignalingState signalingState = SignalingState.idle;
   String peerId = "";
+
+  late RTCPeerConnection connection;
   late RTCPeerConnection callerConnection;
 
   @override
@@ -42,6 +44,11 @@ class _AppState extends State<App> {
         this.id = id;
         isConnecting = false;
       });
+    });
+
+    socket.on("callAnswered", (answer) {
+      final description = RTCSessionDescription(answer['sdp'], answer['type']);
+      callerConnection.setRemoteDescription(description);
     });
 
     socket.on("exception/callPeer", (error) {
@@ -75,6 +82,17 @@ class _AppState extends State<App> {
       ],
       'sdpSemantics': 'unified-plan'
     });
+
+    callerConnection.onConnectionState = (state) {
+      if (state != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        return;
+      }
+
+      setState(() {
+        signalingState = SignalingState.connected;
+        connection = callerConnection;
+      });
+    };
 
     RTCSessionDescription offer = await callerConnection.createOffer();
     await callerConnection.setLocalDescription(offer);
